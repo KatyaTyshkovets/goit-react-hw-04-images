@@ -9,7 +9,12 @@ const modalRoot = document.querySelector('#modal-root');
 const Modal = ({ children, onClose }) => {
    const isFirstRender = useRef(true);
   useEffect(() => {
-   
+   const closeModal = ({code, target, currentTarget}) => {
+  if(code === 'Escape' || target === currentTarget){
+    onClose();
+  };
+};
+
     if (isFirstRender.current) {
       window.addEventListener('keydown', closeModal);
       isFirstRender.current = false;
@@ -17,15 +22,12 @@ const Modal = ({ children, onClose }) => {
     }
     
     return () => { window.removeEventListener('keydown', closeModal); }
+     
     
-    }
+    },[onClose]
 );
 
- const closeModal = ({code, target, currentTarget}) => {
-  if(code === 'Escape' || target === currentTarget){
-    onClose();
-  };
-};
+
 
 return createPortal(
   <Overlay onClick={onClose}>
