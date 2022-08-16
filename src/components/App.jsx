@@ -1,4 +1,3 @@
-import { Component } from "react";
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer, toast } from "react-toastify";
 import { ThreeDots} from 'react-loader-spinner';
@@ -7,113 +6,88 @@ import Searchbar from "./Searchbar/Searchbar";
 import ImageGallery from "./ImageGallery";
 import Button from "./Button";
 import * as API from './Services/Api';
-import Modal from "./Modal";
+import Modal from "./Modal/Modal";
 import { Box } from './Wrapper/Container.styled';
+import { useState, useEffect } from "react";
 
 
+export const App = () => {
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [isShowModal, setIsShowModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(null);
+  const [lastPage, setLastPage] = useState(null);
+  const [imageData, setImageData] = useState({url: null, alt: ''})
 
-
-export class App extends Component {
-  state = {
-    q: '',
-    page: 1,
-    items: [],
-    totalHits: null,
-    loading: false,
-    isShowModal: false,
-    lastPage: null,
-  };
-
-  async componentDidUpdate(_, prevState) {
-    const { q, page } = this.state;
-    if (prevState.q !== q || prevState.page !== page) {
-      this.setState({ loading: true });
-      try {
-        if (q === '') {
-          return this.setState({
-            items: [],
-            q: '',
-          });
-        }
-        const { hits, totalHits } = await API.getImages({ q, page });
-        if (totalHits || hits.length) {
-          if (page === 1) {
-            toast.success(`we found ${totalHits}images`);
-          }
-          if (page >= 1) {
-            this.setState({
-              totalHits: totalHits,
-              lastPage: Math.ceil(totalHits / 12),
-            });
-          }
-        }
-        if (hits.length < 12) {
-          toast.warning(`Sorry no more found images for "${q}"`);
-        }
-        this.setState({
-          items: prevState.q !== q ? hits : [...prevState.items, ...hits],
-        });
-    } catch (error) {
-      toast.error('Last page'); 
-    } finally {
-      this.setState({ loading: false });
-    }
-    
-    }
-  }
-
-  formOnSumbit = values => {
-    const { q } = this.state;
-    if (values === q && values !== '') {
-      toast.info("Please entry new name");
-      return this.setState({
-        items: [],
-        q: '',
-        page: 1,
-        totalHits: null,
-      });
-    }
-      if (values === '') {
-        this.setState({
-          items: [],
-          q: '',
-          page: 1,
-        });
-        toast.info('Please entry name!');
+  useEffect(() => {
+    const onFetch = async () => {
+      if (q === '') {
+        return;
       }
-     
-    this.setState({
-      page: 1,
-      q: values,
-    });
-  };
-  
-   onToggleModal = e => {
-    this.setState(({ isShowModal }) => ({
-      isShowModal: !isShowModal,
-    }));
-    if (!this.state.isShowModal) {
-      this.setState({
-        largeImageURL: e.target.dataset.set,
-        alt: e.target.alt,
-      });
+      if (q !== '' || page !== 1) {
+        setLoading(true);
+      }
+      try {
+        const { hits, totalHits } = await API.getImages({ q, page });
+
+        if (page >= 1) {
+          setTotal(totalHits);
+          setLastPage(Math.ceil(total / 12));
+          setItems(state => (page === 1 ? hits : [...state, ...hits]));
+          if (page === 1) {
+            toast.success(` We found ${totalHits} images.`);
+          }
+        }
+
+        if (hits.length < 12) {
+          toast(`Sorry no more found images for "${q}"`);
+        }
+      } catch (error) {
+        toast.warning('Last page');
+      } finally {
+        setLoading(false);
+      }
+    };
+    onFetch();
+  }, [q, page, total]);
+
+  const formOnSumbit = values => {
+    if (values === q && values !== '') {
+      toast.info('Please entry new name');
+      setItems([]);
+      setQ('');
+      setPage(1);
+      setTotal(null);
+      return;
     }
+    if (values === '') {
+      setItems([]);
+      setQ('');
+      setPage(1);
+      toast.info('Please entry name');
+      return;
+    }
+
+    setQ(values);
+    setPage(1);
   };
-  
-  loadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
-  }
 
+  const onToggleModal= (e) => {
+  setIsShowModal(prevState => !isShowModal);
+  if (!isShowModal) {
+    setImageData({ url: e.target.dataset.set, alt: e.target.alt });
+  };
+};
 
-  render() {
-     const { items, isShowModal, largeImageURL, alt, loading, page, lastPage } =
-      this.state;
+  const loadMore = () => {
+    setPage(prevState => prevState + 1);
+  };
 
     return (
       <GlobalStyled>
-        <Searchbar onSubmit={this.formOnSumbit} />
+        <Searchbar onSubmit={formOnSumbit} />
         <Box>
           {loading && (<ThreeDots color="#00BFFF" height={60} width={60} />)}
            <ToastContainer
@@ -122,18 +96,17 @@ export class App extends Component {
           />
           </Box>
          {items.length !== 0 && (
-          <ImageGallery images={items} onClick={this.onToggleModal} />
+          <ImageGallery images={items} onClick={onToggleModal} />
         )}
-        {isShowModal && (
-          <Modal onClose={this.onToggleModal}>
-            <img src={largeImageURL} alt={alt} />
+          {items.length >= 12 && page !== lastPage && (
+          <Button onClick={loadMore}>Load more</Button>
+        )}
+       {isShowModal && (
+          <Modal onClose={onToggleModal}>
+            <img src={imageData.url} alt={imageData.alt} />
           </Modal>
         )}
-        {items.length >= 12 && page !== lastPage && (
-          <Button onClick={this.loadMore}>Load more</Button>
-        )}
-       
       </GlobalStyled>
     );
   }
-}
+
